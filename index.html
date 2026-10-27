@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MCU Journey Tracker</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Inter,Arial,sans-serif;background:#0b0d12;color:#f5f5f5}
+header{padding:28px 20px;text-align:center;background:linear-gradient(135deg,#161a24,#0b0d12);border-bottom:1px solid #252a36}
+h1{margin:0 0 8px;font-size:30px}.sub{color:#a9afbd;margin:0}
+.wrap{max-width:900px;margin:auto;padding:20px}
+.stats{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}.stat{flex:1;min-width:130px;background:#151923;border:1px solid #252a36;border-radius:14px;padding:14px}.num{font-size:25px;font-weight:700}.label{color:#9da4b3;font-size:13px}
+.progress{height:10px;background:#252a36;border-radius:99px;overflow:hidden;margin:12px 0 24px}.bar{height:100%;width:0;background:#e62429;transition:.25s}
+.controls{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}button,.filter{background:#171b25;color:#fff;border:1px solid #303645;border-radius:10px;padding:10px 13px;cursor:pointer}.filter.active{background:#e62429;border-color:#e62429}
+.phase{margin:28px 0 10px;color:#e62429;font-size:19px}
+.item{display:flex;align-items:center;gap:14px;background:#151923;border:1px solid #252a36;border-radius:13px;padding:14px;margin:9px 0}.item.watched{opacity:.55}.item input{width:20px;height:20px;accent-color:#e62429;cursor:pointer}.item-number{width:28px;text-align:center;font-weight:700;color:#e62429;font-size:15px;flex-shrink:0}.title{font-weight:650}.meta{color:#9299a8;font-size:13px;margin-top:4px}.tag{margin-left:auto;font-size:11px;color:#b7bdc9;border:1px solid #303645;border-radius:20px;padding:4px 8px}
+footer{text-align:center;color:#707786;padding:30px 0;font-size:13px}
+</style>
+</head>
+<body>
+<header><h1>🦸 MCU Journey Tracker</h1><p class="sub">Track the essential MCU journey toward Avengers: Doomsday</p></header>
+<div class="wrap">
+<div class="stats">
+<div class="stat"><div class="num" id="watched">0</div><div class="label">Watched</div></div>
+<div class="stat"><div class="num" id="total">0</div><div class="label">Total</div></div>
+<div class="stat"><div class="num" id="percent">0%</div><div class="label">Progress</div></div>
+</div>
+<div class="progress"><div class="bar" id="bar"></div></div>
+<div class="controls">
+<button class="filter active" data-filter="all">All</button>
+<button class="filter" data-filter="unwatched">Unwatched</button>
+<button class="filter" data-filter="watched">Watched</button>
+<button id="reset">Reset</button>
+</div>
+<div id="list"></div>
+<footer>Your progress is saved automatically in this browser.</footer>
+</div>
+<script>
+const items=[
+["Phase 1","Iron Man","2008","Movie"],
+["Phase 1","The Incredible Hulk","2008","Movie"],
+["Phase 1","Iron Man 2","2010","Movie"],
+["Phase 1","Thor","2011","Movie"],
+["Phase 1","Captain America: The First Avenger","2011","Movie"],
+["Phase 1","The Avengers","2012","Movie"],
+["Phase 2","Iron Man 3","2013","Movie"],
+["Phase 2","Thor: The Dark World","2013","Movie"],
+["Phase 2","Captain America: The Winter Soldier","2014","Movie"],
+["Phase 2","Guardians of the Galaxy","2014","Movie"],
+["Phase 2","Avengers: Age of Ultron","2015","Movie"],
+["Phase 2","Ant-Man","2015","Movie"],
+["Phase 3","Captain America: Civil War","2016","Movie"],
+["Phase 3","Doctor Strange","2016","Movie"],
+["Phase 3","Guardians of the Galaxy Vol. 2","2017","Movie"],
+["Phase 3","Spider-Man: Homecoming","2017","Movie"],
+["Phase 3","Thor: Ragnarok","2017","Movie"],
+["Phase 3","Black Panther","2018","Movie"],
+["Phase 3","Avengers: Infinity War","2018","Movie"],
+["Phase 3","Ant-Man and the Wasp","2018","Movie"],
+["Phase 3","Captain Marvel","2019","Movie"],
+["Phase 3","Avengers: Endgame","2019","Movie"],
+["Phase 3","Spider-Man: Far From Home","2019","Movie"],
+["Phase 4","WandaVision","2021","Series"],
+["Phase 4","Loki — Season 1","2021","Series"],
+["Phase 4","Shang-Chi and the Legend of the Ten Rings","2021","Movie"],
+["Phase 4","Spider-Man: No Way Home","2021","Movie"],
+["Phase 4","Doctor Strange in the Multiverse of Madness","2022","Movie"],
+["Phase 4","Black Panther: Wakanda Forever","2022","Movie"],
+["Phase 5","Ant-Man and the Wasp: Quantumania","2023","Movie"],
+["Phase 5","Guardians of the Galaxy Vol. 3","2023","Movie"],
+["Phase 5","Loki — Season 2","2023","Series"],
+["Phase 5","The Marvels","2023","Movie"],
+["Phase 5","Deadpool & Wolverine","2024","Movie"],
+["Phase 5","Captain America: Brave New World","2025","Movie"],
+["Phase 5","Thunderbolts*","2025","Movie"],
+["Phase 5","Daredevil: Born Again — Season 1","2025","Series"],
+["Phase 6","The Fantastic Four: First Steps","2025","Movie"],
+["Phase 6","Daredevil: Born Again — Season 2","2026","Series"],
+["Phase 6","Avengers: Doomsday","2026","Upcoming"]
+];
+// Version 2 starts every new browser with a clean, unchecked tracker.
+// Progress is still saved independently in each browser using localStorage.
+const key="mcuTracker_v2";
+let state=JSON.parse(localStorage.getItem(key)||"null");
+if(!state){
+  state={};
+  items.forEach((x,i)=>{ state[i]=false; });
+  localStorage.setItem(key,JSON.stringify(state));
+}
+const list=document.getElementById("list");
+let current="all";
+function render(){
+ list.innerHTML="";
+ let phase="";
+ items.forEach((x,i)=>{
+  const done=!!state[i];
+  if(current==="watched"&&!done||current==="unwatched"&&done)return;
+  if(x[0]!==phase){phase=x[0];const h=document.createElement("div");h.className="phase";h.textContent="— "+phase;list.appendChild(h)}
+  const el=document.createElement("div");el.className="item"+(done?" watched":"");
+  el.innerHTML=`<span class="item-number">${i+1}</span><input type="checkbox" ${done?"checked":""} aria-label="Mark ${x[1]} watched"><div><div class="title">${x[1]}</div><div class="meta">${x[2]}</div></div><span class="tag">${x[3]}</span>`;
+  el.querySelector("input").onchange=e=>{state[i]=e.target.checked;localStorage.setItem(key,JSON.stringify(state));render()};
+  list.appendChild(el);
+ });
+ update();
+}
+function update(){
+ const watched=Object.values(state).filter(Boolean).length,total=items.length,p=Math.round(watched/total*100);
+ document.getElementById("watched").textContent=watched;
+ document.getElementById("total").textContent=total;
+ document.getElementById("percent").textContent=p+"%";
+ document.getElementById("bar").style.width=p+"%";
+}
+document.querySelectorAll(".filter").forEach(b=>b.onclick=()=>{document.querySelectorAll(".filter").forEach(z=>z.classList.remove("active"));b.classList.add("active");current=b.dataset.filter;render()});
+document.getElementById("reset").onclick=()=>{if(confirm("Reset all watched items?")){localStorage.removeItem(key);location.reload()}};
+render();
+</script>
+</body>
+</html>
